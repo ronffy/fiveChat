@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>node+websocket</title>
+	<style>
+		html, body {
+		    margin: 0;
+		    background-color: #efefef;
+		    font-family: sans-serif;
+		}
+		.wrapper {
+		    width: 500px;
+		    height: 640px;
+		    padding: 5px;
+		    margin: 0 auto;
+		    background-color: #ddd;
+		}
+		#loginWrapper {
+		    position: fixed;
+		    top: 0;
+		    right: 0;
+		    bottom: 0;
+		    left: 0;
+		    background-color: rgba(5, 5, 5, .6);
+		    text-align: center;
+		    color: #fff;
+		    display: block;
+		    padding-top: 200px;
+		}
+		#nickWrapper {
+		    display: none;
+		}
+		.banner {
+		    height: 80px;
+		    width: 100%;
+		}
+		.banner p {
+		    float: left;
+		    display: inline-block;
+		}
+		.controls {
+		    height: 100px;
+		    margin: 5px 0px;
+		    position: relative;
+		}
+		#historyMsg {
+		    height: 400px;
+		    background-color: #fff;
+		    overflow: auto;
+		    padding: 2px;
+		}
+		#historyMsg img {
+		    max-width: 99%;
+		}
+		.timespan {
+		    color: #ddd;
+		}
+		.items {
+		    height: 30px;
+		}
+		#colorStyle {
+		    width: 50px;
+		    border: none;
+		    padding: 0;
+		}
+		/*custom the file input*/
+		 
+		.imageLable {
+		    position: relative;
+		}
+		#sendImage {
+		    position: absolute;
+		    width: 52px;
+		    left: 0;
+		    opacity: 0;
+		    overflow: hidden;
+		}
+		/*end custom file input*/
+		 
+		#messageInput {
+		    width: 440px;
+		    max-width: 440px;
+		    height: 90px;
+		    max-height: 90px;
+		}
+		#sendBtn {
+		    width: 50px;
+		    height: 96px;
+		    float: right;
+		}
+		#emojiWrapper {
+		    display: none;
+		    width: 500px;
+		    bottom: 105px;
+		    position: absolute;
+		    background-color: #aaa;
+		    box-shadow: 0 0 10px #555;
+		}
+		#emojiWrapper img {
+		    margin: 2px;
+		    padding: 2px;
+		    width: 25px;
+		    height: 25px;
+		}
+		#emojiWrapper img:hover {
+		    background-color: blue;
+		}
+		.emoji{
+		    display: inline;
+		}
+		footer {
+		    text-align: center;
+		}
+		#historyMsg img {
+		    max-width: 30%;
+		}
+	</style>
+</head>
+<body>
+	<div>
+		功能：系统消息、发送文字、图片、表情
+		<p>待完善： 实现窗口抖动效果、语音效果、</p>
+	</div>
+	<div class="wrapper">
+	    <div class="banner">
+	        <h1>HiChat :) </h1>
+	        <span id="status"></span>
+	    </div>
+	    <div id="historyMsg">
+	    </div>
+	    <div class="controls" >
+	        <div class="items">
+	        	<input id="colorStyle" type="color" placeHolder='#000' title="font color" />
+	            <input id="emoji" type="button" value="emoji" title="emoji" />
+	            <label for="sendImage" class="imageLable">
+	                <input type="button" value="image"  />
+	                <input id="sendImage" type="file" value="image"/>
+	            </label>
+	            <input id="clearBtn" type="button" value="clear" title="clear screen" />
+	        </div>
+	        <textarea id="messageInput" placeHolder="enter to send"></textarea>
+	        <input id="sendBtn" type="button" value="发送">
+	        <div id="emojiWrapper">
+	        </div>
+	    </div>
+	</div>
+	<div id="loginWrapper">
+	    <p id="info">正在连接服务...</p>
+	    <div id="nickWrapper">
+	        <input type="text" placeHolder="请输入用户名称" id="nicknameInput" />
+	        <input type="button" value="提交" id="loginBtn" />
+	    </div>
+	</div>
+<script src="socket.io.js"></script>
+<script>
+	window.onload = function() {
+	    //实例并初始化我们的hichat程序
+	    var hichat = new HiChat();
+	    hichat.init();
+	};
+	 
+	//定义我们的hichat类
+	var HiChat = function() {
+	    this.socket = null;
+	};
+	 
+	//向原型添加业务方法
+	HiChat.prototype = {
+	    init: function() {//此方法初始化程序
+	        var that = this;
+	        //建立到服务器的socket连接
+	        this.socket = io.connect();
+	        //监听socket的connect事件，此事件表示连接已经建立
+	        this.socket.on('connect', function() {
+	            //连接到服务器后，显示昵称输入框
+	            document.getElementById('info').textContent = '请输入名称：';
+	            document.getElementById('nickWrapper').style.display = 'block';
+	            document.getElementById('nicknameInput').focus();
+
+	            //昵称设置的确定按钮
+	            document.getElementById('loginBtn').addEventListener('click', function() {
+	                var nickName = document.getElementById('nicknameInput').value;
+	                that.nickName = nickName;
+	                //检查昵称输入框是否为空
+	                if (nickName.trim().length) {
+	                    //不为空，则发起一个login事件并将输入的昵称发送到服务器
+	                    that.socket.emit('login', nickName);
+	                } else {
+	                    //否则输入框获得焦点
+	                    document.getElementById('nicknameInput').focus();
+	                };
+	            }, false);
+	            document.getElementById("sendBtn").onclick = function(){
+	            	var msg = document.getElementById("messageInput").value;
+	            	if(!msg)return false;
+	            	var color = document.getElementById("colorStyle").value;
+	            	that.socket.emit("sendMsg",msg,color);
+	            	that._displayNewMsg("我：",msg,color);
+	            	return false;
+	            }
+	            document.getElementById("sendImage").onchange = function(){
+	            	if(this.files.length){
+	            		// 获取文件，并用filerReader进行读取
+	            		var file = this.files[0];
+	            		reader = new FileReader();
+	            		if(!reader){
+	            			that._displayNewMsg("system",'浏览器不支持 fileReader',"red");
+	            			this.value = "";
+	            			return false;
+	            		}
+	            		reader.onload = function(e){
+	            			this.value = "";
+	            			that.socket.emit("img",e.target.result);
+	            			that._displayImage("我：",e.target.result);
+	            		};
+	            		reader.readAsDataURL(file);
+	            	}
+	            };
+	            document.getElementById('emoji').addEventListener('click', function(e) {
+	                var emojiwrapper = document.getElementById('emojiWrapper');
+	                emojiwrapper.style.display = 'block';
+	                e.stopPropagation();
+	            }, false);
+	            document.body.addEventListener('click', function(e) {
+	                var emojiwrapper = document.getElementById('emojiWrapper');
+	                if (e.target != emojiwrapper) {
+	                    emojiwrapper.style.display = 'none';
+	                };
+	            });
+	            document.getElementById('emojiWrapper').addEventListener('click', function(e) {
+	                //获取被点击的表情
+	                var target = e.target;
+	                if (target.nodeName.toLowerCase() == 'img') {
+	                    var messageInput = document.getElementById('messageInput');
+	                    messageInput.focus();
+	                    messageInput.value = messageInput.value + '[emoji:' + target.title + ']';
+	                };
+	            }, false);
+	        });
+	        this.socket.on("nickExisted",function(){
+	        	document.getElementById('info').textContent = '名称已被占用'; //显示昵称被占用的提示
+	        });
+	        this.socket.on('msg',function(nickName,msg,color){
+	        	that._displayNewMsg(nickName,msg,color);
+	        });
+	        this.socket.on("webimg",function(nickName,imgUrl){
+	        	that._displayImage(nickName,imgUrl);
+	        })
+	        this.socket.on("loginSuccess",function(){
+	        	document.title = 'hichat | ' + document.getElementById('nicknameInput').value;
+	        	document.getElementById('loginWrapper').style.display = 'none';//隐藏遮罩层显聊天界面
+	        	document.getElementById('messageInput').focus();//让消息输入框获得焦点
+	        });
+	        this.socket.on("system",function(nickName, userCount, type){
+	        	var msg = nickName + (type == "login" ? " 来了" : " 退出");
+	        	//判断用户是连接还是离开以显示不同的信息
+	        	var p = document.createElement('p');
+	        	that._displayNewMsg('系统消息：',msg,'red');
+	        	//将在线人数显示到页面顶部
+	        	document.getElementById('status').textContent = userCount + (userCount > 1 ? ' users' : ' user') + ' online';
+	        });
+
+	        this._initialEmoji();
+
+	        window.onbeforeunload = function(){
+	        	// 无需前端通知服务端，服务端会自动检测到用户断开连接，并触发disconnect事件
+	        }
+	    },
+	    _initialEmoji : function(){
+	    	var emojiContainer = document.getElementById('emojiWrapper'),
+	    	    docFragment = document.createDocumentFragment();
+	    	for (var i = 100; i > 0; i--) {
+	    	    var emojiItem = document.createElement('img');
+	    	    emojiItem.src = 'http://www.fuhaodq.com/fhimg/1/bqfh' + i + '.png';
+	    	    emojiItem.title = i;
+	    	    docFragment.appendChild(emojiItem);
+	    	};
+	    	emojiContainer.appendChild(docFragment);
+	    },
+	    _displayNewMsg : function(user,msg,color){
+	    	var that = this;
+	    	var container = document.getElementById('historyMsg'),
+	    	    msgToDisplay = document.createElement('p'),
+	    	    date = new Date().toTimeString().substr(0, 8);
+	    	msgToDisplay.style.color = color || '#000';
+	    	msgToDisplay.innerHTML = user + '<span class="timespan">(</span>' + date + '): ' + that._encodeEmoji(msg);
+	    	container.appendChild(msgToDisplay);
+	    	container.scrollTop = container.scrollHeight;
+	    	document.getElementById('messageInput').value = "";
+
+	    },
+	    _encodeEmoji : function(msg){
+	    	var reg = /\[.+?:(\d+)\]/gi;
+	    	if(reg.test(msg)){
+	    		msg = msg.replace(reg,function(origin,s){
+	    			return '<img src="http://www.fuhaodq.com/fhimg/1/bqfh' + s + '.png">';
+	    		});
+	    	}
+	    	return msg;
+	    },
+	    _displayImage : function(user,imgUrl){
+	    	var container = document.getElementById('historyMsg'),
+	    	    msgToDisplay = document.createElement('p'),
+	    	    date = new Date().toTimeString().substr(0, 8);
+	    	msgToDisplay.innerHTML = user + '<span class="timespan">(</span>' + date + '): ' + '<img src="' + imgUrl + '">';
+	    	container.appendChild(msgToDisplay);
+	    	container.scrollTop = container.scrollHeight;
+	    }
+	};
+</script>
+</body>
+</html>
