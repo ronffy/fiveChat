@@ -5,7 +5,8 @@
 
 ##### 运行命令:
 ```javascipt
-npm install 
+npm install
+npm install socket.io
 node server
 ```
 ##### 然后再浏览器打开 localhost:8080 (如果端口被占用，在server.js中修改端口号再运行 node server ,然后访问即可)
