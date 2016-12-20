@@ -69,7 +69,7 @@
 		.imageLable {
 		    position: relative;
 		}
-		#sendImage {
+		#sendImage,#sendVideo {
 		    position: absolute;
 		    width: 52px;
 		    left: 0;
@@ -115,31 +115,76 @@
 		#historyMsg img {
 		    max-width: 30%;
 		}
+		.tipbox{
+			position: absolute;
+			left: 0;
+			top: -30px;
+			width: 100%;
+			height: 30px;
+			padding-left: 10px;
+			overflow: hidden;
+			line-height: 30px;
+			z-index: 101;
+			background: #eee;
+			font-size: 13px;
+		}
+		/*抖动动画：*/
+		.shake{
+			-webkit-animation: shake 0.3s ease-in-out;
+			-moz-animation: shake 0.3s ease-in-out;
+			-o-animation: shake 0.3s ease-in-out;
+			animation: shake 0.3s ease-in-out;
+		}
+		@keyframes shake{
+			0%{
+				transform:rotate(0deg);
+			}
+			20%{
+				transform:rotate(3deg);
+			}
+			40%{
+				transform:rotate(0deg);
+			}
+			60%{
+				transform:rotate(3deg);
+			}
+			80%{
+				transform:rotate(0deg);
+			}
+			100%{
+				transform:rotate(3deg);
+			}
+		}
 	</style>
 </head>
 <body>
 	<div>
-		功能：系统消息、发送文字、图片、表情
-		<p>待完善： 实现窗口抖动效果、语音效果、</p>
+		功能：系统消息、发送文字、图片、视频、表情、窗口抖动效果
+		<p>待完善： 语音效果、</p>
 	</div>
-	<div class="wrapper">
+	<div id="wrapper" class="wrapper">
 	    <div class="banner">
-	        <h1>HiChat :) </h1>
+	        <h1>Hi：<span id="name"></span></h1>
 	        <span id="status"></span>
 	    </div>
 	    <div id="historyMsg">
 	    </div>
-	    <div class="controls" >
+	    <div class="controls" id="controls">
 	        <div class="items">
-	        	<input id="colorStyle" type="color" placeHolder='#000' title="font color" />
-	            <input id="emoji" type="button" value="emoji" title="emoji" />
+	            <input id="emoji" type="button" value="表情" title="emoji" />
 	            <label for="sendImage" class="imageLable">
-	                <input type="button" value="image"  />
+	                <input type="button" value="图片"/>
 	                <input id="sendImage" type="file" value="image"/>
 	            </label>
-	            <input id="clearBtn" type="button" value="clear" title="clear screen" />
+	            <label for="sendVideo" class="imageLable">
+	                <input type="button" value="视频"/>
+	                <input id="sendVideo" type="file" value="视频"/>
+	            </label>
+	            <input id="shake" type="button" value="抖动一下">
+	            <input id="clearBtn" type="button" value="清屏" title="clear screen" />
+	            <input id="colorStyle" type="color" placeHolder='#000' title="font color" />
 	        </div>
-	        <textarea id="messageInput" placeHolder="enter to send"></textarea>
+	        <textarea id="messageInput" placeHolder="请输入内容"></textarea>
 	        <input id="sendBtn" type="button" value="发送">
 	        <div id="emojiWrapper">
 	        </div>
@@ -167,6 +212,7 @@
 	 
 	//向原型添加业务方法
 	HiChat.prototype = {
+		fileId : 1,
 	    init: function() {//此方法初始化程序
 	        var that = this;
 	        //建立到服务器的socket连接
@@ -203,20 +249,84 @@
 	            	if(this.files.length){
 	            		// 获取文件，并用filerReader进行读取
 	            		var file = this.files[0];
-	            		reader = new FileReader();
-	            		if(!reader){
-	            			that._displayNewMsg("system",'浏览器不支持 fileReader',"red");
+	            		if(!window.FileReader){
+	            			that._displayNewMsg("系统消息",'浏览器不支持 fileReader',"red");
 	            			this.value = "";
 	            			return false;
 	            		}
+	            		if(!/^image\/\w+$/gi.test(file.type)){
+	            			that._displayNewMsg("系统消息",'文件格式不是图片，请重新上传',"red");
+	            			this.value = "";
+	            			return false;
+	            		}
+	            		if(file.size > 1048576){
+	            			that._displayNewMsg("系统消息",'图片最大不能超过1M，请重新上传',"red");
+	            			this.value = "";
+	            			return false;
+	            		}
+	            		var reader = new FileReader();
+	            		reader.readAsDataURL(file);
+	            		// reader.readAsBinaryString(file);
 	            		reader.onload = function(e){
 	            			this.value = "";
 	            			that.socket.emit("img",e.target.result);
 	            			that._displayImage("我：",e.target.result);
 	            		};
-	            		reader.readAsDataURL(file);
+	            		reader.onerror = function(e){
+	            			console.log(e);
+	            			that._displayNewMsg("系统消息",'reader读取文件出错！',"red");
+	            			this.value = "";
+	            		}
+	            		reader.onprogress = function(e){
+	            			var pro = (e.loaded / e.total) * 100;
+	            			console.log("进度是：" + pro);
+	            			console.log(e);
+
+	            		}
 	            	}
 	            };
+	            document.getElementById("sendVideo").onchange = function(){
+	            	if(this.files.length){
+	            		// 获取文件，并用filerReader进行读取
+	            		var file = this.files[0];
+	            		if(!window.FileReader){
+	            			that._displayNewMsg("系统消息",'浏览器不支持 fileReader',"red");
+	            			this.value = "";
+	            			return false;
+	            		}
+	            		if(!/^video\/\w+$/gi.test(file.type)){
+	            			that._displayNewMsg("系统消息",'文件格式不是视频，请重新上传',"red");
+	            			this.value = "";
+	            			return false;
+	            		}
+	            		if(file.size > 10485760){
+	            			that._displayNewMsg("系统消息",'视频最大不能超过10M，请重新上传',"red");
+	            			this.value = "";
+	            			return false;
+	            		}
+	            		var reader = new FileReader();
+	            		reader.readAsDataURL(file);
+	            		// reader.readAsBinaryString(file);
+	            		reader.fileId = that.fileId;
+	            		that.fileId++;
+	            		reader.onload = function(e){
+	            			var fileTip = document.getElementById("fileId" + this.fileId);
+	            			fileTip.parentNode.removeChild(fileTip);
+	            			this.value = "";
+	            			that.socket.emit("video",e.target.result);
+	            			that._displayVideo("我：",e.target.result);
+	            		};
+	            		reader.onerror = function(e){
+	            			console.log(e);
+	            			that._displayNewMsg("系统消息",'reader读取文件出错！',"red");
+	            			this.value = "";
+	            		}
+	            		reader.onprogress = function(e){
+	            			var pro = (e.loaded / e.total) * 100;
+	            			that._tipMsg(this.fileId,"上传视频进度为是" + pro.toFixed(2),"#ccc");
+	            		}
+	            	}
+	            }
 	            document.getElementById('emoji').addEventListener('click', function(e) {
 	                var emojiwrapper = document.getElementById('emojiWrapper');
 	                emojiwrapper.style.display = 'block';
@@ -228,6 +338,9 @@
 	                    emojiwrapper.style.display = 'none';
 	                };
 	            });
+	            document.getElementById("clearBtn").addEventListener("click",function(){
+	            	document.getElementById("historyMsg").innerHTML = "";
+	            })
 	            document.getElementById('emojiWrapper').addEventListener('click', function(e) {
 	                //获取被点击的表情
 	                var target = e.target;
@@ -237,6 +350,9 @@
 	                    messageInput.value = messageInput.value + '[emoji:' + target.title + ']';
 	                };
 	            }, false);
+	            document.getElementById("shake").addEventListener("click",function(){
+	            	that.socket.emit("shake",that.nickName);
+	            });
 	        });
 	        this.socket.on("nickExisted",function(){
 	        	document.getElementById('info').textContent = '名称已被占用'; //显示昵称被占用的提示
@@ -248,7 +364,9 @@
 	        	that._displayImage(nickName,imgUrl);
 	        })
 	        this.socket.on("loginSuccess",function(){
-	        	document.title = 'hichat | ' + document.getElementById('nicknameInput').value;
+	        	var name = document.getElementById('nicknameInput').value;
+	        	document.getElementById("name").innerText = name;
+	        	document.title = 'hichat | ' + name;
 	        	document.getElementById('loginWrapper').style.display = 'none';//隐藏遮罩层显聊天界面
 	        	document.getElementById('messageInput').focus();//让消息输入框获得焦点
 	        });
@@ -260,12 +378,40 @@
 	        	//将在线人数显示到页面顶部
 	        	document.getElementById('status').textContent = userCount + (userCount > 1 ? ' users' : ' user') + ' online';
 	        });
+	        this.socket.on("webShake",function(nickName){
+	        	that._displayNewMsg(nickName,"抖了一下","blue");
+	        	that._doShake();
+	        });
+	        this.socket.on("webVideo",function(nickName,url){
+	        	that._displayVideo(nickName,url);
+	        })
 
 	        this._initialEmoji();
 
 	        window.onbeforeunload = function(){
 	        	// 无需前端通知服务端，服务端会自动检测到用户断开连接，并触发disconnect事件
 	        }
+	    },
+	    _tipMsg : function(fileid,msg,color){
+	    	var controlNode = document.getElementById("controls");
+	    	var fileNode = document.getElementById('fileId' + fileid);
+	    	if(fileNode){
+	    		fileNode.innerText = msg;
+	    	}else{
+	    		fileNode = document.createElement("div");
+	    		fileNode.id = 'fileId' + fileid;
+	    		fileNode.className = "tipbox";
+	    		fileNode.innerText = msg;
+	    		controlNode.appendChild(fileNode);
+	    	}
+	    },
+	    _doShake : function(){
+	    	var wrapper = document.getElementById("wrapper");
+	    	wrapper.className += " shake";
+	    	setTimeout(function(){
+	    		var classs = wrapper.className.replace(/\s*?shake/gi,"");
+	    		wrapper.className = classs;
+	    	},300);
 	    },
 	    _initialEmoji : function(){
 	    	var emojiContainer = document.getElementById('emojiWrapper'),
@@ -304,6 +450,14 @@
 	    	    msgToDisplay = document.createElement('p'),
 	    	    date = new Date().toTimeString().substr(0, 8);
 	    	msgToDisplay.innerHTML = user + '<span class="timespan">(</span>' + date + '): ' + '<img src="' + imgUrl + '">';
+	    	container.appendChild(msgToDisplay);
+	    	container.scrollTop = container.scrollHeight;
+	    },
+	    _displayVideo : function(user,url){
+	    	var container = document.getElementById('historyMsg'),
+	    	    msgToDisplay = document.createElement('p'),
+	    	    date = new Date().toTimeString().substr(0, 8);
+	    	msgToDisplay.innerHTML = user + '<span class="timespan">(</span>' + date + '): ' + '<p><video width="320" controls="false"><source src="' + url+ '">您的浏览器不支持Video标签。</video></p>';
 	    	container.appendChild(msgToDisplay);
 	    	container.scrollTop = container.scrollHeight;
 	    }
