@@ -28,8 +28,8 @@ io.on('connection', function(socket) {
     socket.on('sendMsg',function(msg,color){
         socket.broadcast.emit("msg",socket.nickname,msg,color);
     });
-    socket.on('img',function(imgUrl){
-        socket.broadcast.emit("webimg",socket.nickname,imgUrl)
+    socket.on('image',function(imgUrl){
+        socket.broadcast.emit("webimage",socket.nickname,imgUrl)
     });
     socket.on('video',function(imgUrl){
         socket.broadcast.emit("webVideo",socket.nickname,imgUrl)

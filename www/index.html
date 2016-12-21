@@ -200,183 +200,115 @@
 <script src="socket.io.js"></script>
 <script>
 	window.onload = function() {
-	    //实例并初始化我们的hichat程序
-	    var hichat = new HiChat();
+	    var hichat = new FiveChat();  //实例并初始化我们的hichat程序
 	    hichat.init();
 	};
-	 
-	//定义我们的hichat类
-	var HiChat = function() {
-	    this.socket = null;
+
+	function $id(idname){
+		return document.getElementById(idname);
+	}
+
+	var FiveChat = function() {
+		this.fileId = 1;
 	};
-	 
+	
 	//向原型添加业务方法
-	HiChat.prototype = {
-		fileId : 1,
+	FiveChat.prototype = {
 	    init: function() {//此方法初始化程序
 	        var that = this;
-	        //建立到服务器的socket连接
-	        this.socket = io.connect();
-	        //监听socket的connect事件，此事件表示连接已经建立
-	        this.socket.on('connect', function() {
-	            //连接到服务器后，显示昵称输入框
-	            document.getElementById('info').textContent = '请输入名称：';
-	            document.getElementById('nickWrapper').style.display = 'block';
-	            document.getElementById('nicknameInput').focus();
+	        this.socket = io.connect(); //建立到服务器的socket连接
+	        this.socket.on('connect', function() {  //监听socket的connect事件，此事件表示连接已经建立
+	            $id('info').textContent = '请输入名称：'; //连接到服务器后，显示昵称输入框
+	            $id('nickWrapper').style.display = 'block';
+	            $id('nicknameInput').focus();
 
-	            //昵称设置的确定按钮
-	            document.getElementById('loginBtn').addEventListener('click', function() {
-	                var nickName = document.getElementById('nicknameInput').value;
+	            $id('loginBtn').addEventListener('click', function() {  //昵称设置的确定按钮
+	                var nickName = $id('nicknameInput').value;
 	                that.nickName = nickName;
-	                //检查昵称输入框是否为空
-	                if (nickName.trim().length) {
-	                    //不为空，则发起一个login事件并将输入的昵称发送到服务器
+	                if (nickName.trim().length) { //不为空，则发起一个login事件并将输入的昵称发送到服务器
 	                    that.socket.emit('login', nickName);
-	                } else {
-	                    //否则输入框获得焦点
-	                    document.getElementById('nicknameInput').focus();
+	                } else { //否则输入框获得焦点
+	                    $id('nicknameInput').focus();
 	                };
 	            }, false);
-	            document.getElementById("sendBtn").onclick = function(){
-	            	var msg = document.getElementById("messageInput").value;
+	            $id("sendBtn").onclick = function(){
+	            	var msg = $id("messageInput").value;
 	            	if(!msg)return false;
-	            	var color = document.getElementById("colorStyle").value;
+	            	var color = $id("colorStyle").value;
 	            	that.socket.emit("sendMsg",msg,color);
 	            	that._displayNewMsg("我：",msg,color);
 	            	return false;
 	            }
-	            document.getElementById("sendImage").onchange = function(){
+	            $id("sendImage").onchange = function(){
+	            	var p = this;
 	            	if(this.files.length){
-	            		// 获取文件，并用filerReader进行读取
-	            		var file = this.files[0];
-	            		if(!window.FileReader){
-	            			that._displayNewMsg("系统消息",'浏览器不支持 fileReader',"red");
-	            			this.value = "";
-	            			return false;
-	            		}
-	            		if(!/^image\/\w+$/gi.test(file.type)){
-	            			that._displayNewMsg("系统消息",'文件格式不是图片，请重新上传',"red");
-	            			this.value = "";
-	            			return false;
-	            		}
-	            		if(file.size > 1048576){
-	            			that._displayNewMsg("系统消息",'图片最大不能超过1M，请重新上传',"red");
-	            			this.value = "";
-	            			return false;
-	            		}
-	            		var reader = new FileReader();
-	            		reader.readAsDataURL(file);
-	            		// reader.readAsBinaryString(file);
-	            		reader.onload = function(e){
-	            			this.value = "";
-	            			that.socket.emit("img",e.target.result);
-	            			that._displayImage("我：",e.target.result);
-	            		};
-	            		reader.onerror = function(e){
-	            			console.log(e);
-	            			that._displayNewMsg("系统消息",'reader读取文件出错！',"red");
-	            			this.value = "";
-	            		}
-	            		reader.onprogress = function(e){
-	            			var pro = (e.loaded / e.total) * 100;
-	            			console.log("进度是：" + pro);
-	            			console.log(e);
-
-	            		}
+	            		that._fileReader({
+	            			node : p,
+	            			file : p.files[0],
+	            			type : "image",
+	            			size : 1048576
+	            		});
 	            	}
 	            };
-	            document.getElementById("sendVideo").onchange = function(){
-	            	if(this.files.length){
-	            		// 获取文件，并用filerReader进行读取
-	            		var file = this.files[0];
-	            		if(!window.FileReader){
-	            			that._displayNewMsg("系统消息",'浏览器不支持 fileReader',"red");
-	            			this.value = "";
-	            			return false;
-	            		}
-	            		if(!/^video\/\w+$/gi.test(file.type)){
-	            			that._displayNewMsg("系统消息",'文件格式不是视频，请重新上传',"red");
-	            			this.value = "";
-	            			return false;
-	            		}
-	            		if(file.size > 10485760){
-	            			that._displayNewMsg("系统消息",'视频最大不能超过10M，请重新上传',"red");
-	            			this.value = "";
-	            			return false;
-	            		}
-	            		var reader = new FileReader();
-	            		reader.readAsDataURL(file);
-	            		// reader.readAsBinaryString(file);
-	            		reader.fileId = that.fileId;
-	            		that.fileId++;
-	            		reader.onload = function(e){
-	            			var fileTip = document.getElementById("fileId" + this.fileId);
-	            			fileTip.parentNode.removeChild(fileTip);
-	            			this.value = "";
-	            			that.socket.emit("video",e.target.result);
-	            			that._displayVideo("我：",e.target.result);
-	            		};
-	            		reader.onerror = function(e){
-	            			console.log(e);
-	            			that._displayNewMsg("系统消息",'reader读取文件出错！',"red");
-	            			this.value = "";
-	            		}
-	            		reader.onprogress = function(e){
-	            			var pro = (e.loaded / e.total) * 100;
-	            			that._tipMsg(this.fileId,"上传视频进度为是" + pro.toFixed(2),"#ccc");
-	            		}
+	            $id("sendVideo").onchange = function(){
+	            	var p = this;
+	            	if(p.files.length){
+	            		that._fileReader({
+	            			node : p,
+	            			file : p.files[0],
+	            			type : "video",
+	            			size : 10485760
+	            		});
 	            	}
-	            }
-	            document.getElementById('emoji').addEventListener('click', function(e) {
-	                var emojiwrapper = document.getElementById('emojiWrapper');
+	            };
+	            $id('emoji').addEventListener('click', function(e) {
+	                var emojiwrapper = $id('emojiWrapper');
 	                emojiwrapper.style.display = 'block';
 	                e.stopPropagation();
 	            }, false);
 	            document.body.addEventListener('click', function(e) {
-	                var emojiwrapper = document.getElementById('emojiWrapper');
+	                var emojiwrapper = $id('emojiWrapper');
 	                if (e.target != emojiwrapper) {
 	                    emojiwrapper.style.display = 'none';
 	                };
 	            });
-	            document.getElementById("clearBtn").addEventListener("click",function(){
-	            	document.getElementById("historyMsg").innerHTML = "";
+	            $id("clearBtn").addEventListener("click",function(){
+	            	$id("historyMsg").innerHTML = "";
 	            })
-	            document.getElementById('emojiWrapper').addEventListener('click', function(e) {
+	            $id('emojiWrapper').addEventListener('click', function(e) {
 	                //获取被点击的表情
 	                var target = e.target;
 	                if (target.nodeName.toLowerCase() == 'img') {
-	                    var messageInput = document.getElementById('messageInput');
+	                    var messageInput = $id('messageInput');
 	                    messageInput.focus();
 	                    messageInput.value = messageInput.value + '[emoji:' + target.title + ']';
 	                };
 	            }, false);
-	            document.getElementById("shake").addEventListener("click",function(){
+	            $id("shake").addEventListener("click",function(){
 	            	that.socket.emit("shake",that.nickName);
 	            });
 	        });
 	        this.socket.on("nickExisted",function(){
-	        	document.getElementById('info').textContent = '名称已被占用'; //显示昵称被占用的提示
+	        	$id('info').textContent = '名称已被占用'; //显示昵称被占用的提示
 	        });
 	        this.socket.on('msg',function(nickName,msg,color){
 	        	that._displayNewMsg(nickName,msg,color);
 	        });
-	        this.socket.on("webimg",function(nickName,imgUrl){
+	        this.socket.on("webimage",function(nickName,imgUrl){
 	        	that._displayImage(nickName,imgUrl);
 	        })
 	        this.socket.on("loginSuccess",function(){
-	        	var name = document.getElementById('nicknameInput').value;
-	        	document.getElementById("name").innerText = name;
+	        	var name = $id('nicknameInput').value;
+	        	$id("name").innerText = name;
 	        	document.title = 'hichat | ' + name;
-	        	document.getElementById('loginWrapper').style.display = 'none';//隐藏遮罩层显聊天界面
-	        	document.getElementById('messageInput').focus();//让消息输入框获得焦点
+	        	$id('loginWrapper').style.display = 'none';//隐藏遮罩层显聊天界面
+	        	$id('messageInput').focus();//让消息输入框获得焦点
 	        });
-	        this.socket.on("system",function(nickName, userCount, type){
+	        this.socket.on("system",function(nickName, userCount, type){ //判断用户是连接还是离开以显示不同的信息
 	        	var msg = nickName + (type == "login" ? " 来了" : " 退出");
-	        	//判断用户是连接还是离开以显示不同的信息
 	        	var p = document.createElement('p');
 	        	that._displayNewMsg('系统消息：',msg,'red');
-	        	//将在线人数显示到页面顶部
-	        	document.getElementById('status').textContent = userCount + (userCount > 1 ? ' users' : ' user') + ' online';
+	        	$id('status').textContent = userCount + (userCount > 1 ? ' users' : ' user') + ' online'; //将在线人数显示到页面顶部
 	        });
 	        this.socket.on("webShake",function(nickName){
 	        	that._displayNewMsg(nickName,"抖了一下","blue");
@@ -392,9 +324,74 @@
 	        	// 无需前端通知服务端，服务端会自动检测到用户断开连接，并触发disconnect事件
 	        }
 	    },
+	    _upFirstCase : function(str){
+	    	var arr = str.split("");
+	    	arr[0] = arr[0].toUpperCase();
+	    	return arr.join("");
+	    },
+	    _fileReader : function(opt){ // 获取文件，并用filerReader进行读取
+	    	var that = this,
+	    		node = opt.node,
+	    		file = opt.file,
+	    		type = opt.type,
+	    		reg = new RegExp("^" + type + "\\/\\w+$","i"),
+	    		size = opt.size,
+	    		typeText;
+	    	switch(type){
+	    		case "image":
+	    			typeText = "图片";
+	    			break;
+	    		case "video":
+	    			typeText = "视频";
+	    			break;
+	    		default:
+	    			typeText = "已知格式";
+	    	}
+	    	if(!window.FileReader || !(reg.test(file.type)) || file.size > size){
+	    		if(!window.FileReader){
+	    			that._displayNewMsg("系统消息",'浏览器不支持 fileReader，请升级到最新浏览器再重新上传',"red");
+	    		}
+	    		if(!(reg.test(file.type))){
+	    			that._displayNewMsg("系统消息",'文件格式不是' + typeText + '，请重新上传',"red");
+	    		}
+	    		if(file.size > size){
+	    			that._displayNewMsg("系统消息",typeText + '最大不能超过' + size/1024/1024 + 'M，请重新上传',"red");
+	    		}
+	    		node.value = "";
+	    		return false;
+	    	}
+	    	var reader = new FileReader();
+	    	reader.readAsDataURL(file);
+	    	if(type == "video"){
+	    		reader.fileId = that.fileId;
+	    		that.fileId++;
+	    	}
+	    	reader.onload = function(e){
+	    		var method = "_display" + that._upFirstCase(type);
+	    		that.socket.emit(type,e.target.result);
+	    		that[method]("我：",e.target.result);
+	    		this.value = "";
+	    		if(type == "video"){
+	    			var fileTip = $id("fileId" + this.fileId);
+	    			fileTip.parentNode.removeChild(fileTip);
+	    		}
+	    	};
+	    	reader.onerror = function(e){
+	    		console.log(e);
+	    		debugger;
+	    		that._displayNewMsg("系统消息",'reader读取文件出错！',"red");
+	    		this.value = "";
+	    	}
+	    	if(type == "video"){
+	    		reader.onprogress = function(e){
+	    			var pro = (e.loaded / e.total) * 100;
+	    			that._tipMsg(this.fileId,"上传视频进度为是" + pro.toFixed(2),"#ccc");
+	    		}
+	    	}
+	    },
 	    _tipMsg : function(fileid,msg,color){
-	    	var controlNode = document.getElementById("controls");
-	    	var fileNode = document.getElementById('fileId' + fileid);
+	    	var controlNode = $id("controls");
+	    	var fileNode = $id('fileId' + fileid);
 	    	if(fileNode){
 	    		fileNode.innerText = msg;
 	    	}else{
@@ -406,7 +403,7 @@
 	    	}
 	    },
 	    _doShake : function(){
-	    	var wrapper = document.getElementById("wrapper");
+	    	var wrapper = $id("wrapper");
 	    	wrapper.className += " shake";
 	    	setTimeout(function(){
 	    		var classs = wrapper.className.replace(/\s*?shake/gi,"");
@@ -414,7 +411,7 @@
 	    	},300);
 	    },
 	    _initialEmoji : function(){
-	    	var emojiContainer = document.getElementById('emojiWrapper'),
+	    	var emojiContainer = $id('emojiWrapper'),
 	    	    docFragment = document.createDocumentFragment();
 	    	for (var i = 100; i > 0; i--) {
 	    	    var emojiItem = document.createElement('img');
@@ -426,15 +423,14 @@
 	    },
 	    _displayNewMsg : function(user,msg,color){
 	    	var that = this;
-	    	var container = document.getElementById('historyMsg'),
+	    	var container = $id('historyMsg'),
 	    	    msgToDisplay = document.createElement('p'),
 	    	    date = new Date().toTimeString().substr(0, 8);
 	    	msgToDisplay.style.color = color || '#000';
 	    	msgToDisplay.innerHTML = user + '<span class="timespan">(</span>' + date + '): ' + that._encodeEmoji(msg);
 	    	container.appendChild(msgToDisplay);
 	    	container.scrollTop = container.scrollHeight;
-	    	document.getElementById('messageInput').value = "";
-
+	    	$id('messageInput').value = "";
 	    },
 	    _encodeEmoji : function(msg){
 	    	var reg = /\[.+?:(\d+)\]/gi;
@@ -446,7 +442,7 @@
 	    	return msg;
 	    },
 	    _displayImage : function(user,imgUrl){
-	    	var container = document.getElementById('historyMsg'),
+	    	var container = $id('historyMsg'),
 	    	    msgToDisplay = document.createElement('p'),
 	    	    date = new Date().toTimeString().substr(0, 8);
 	    	msgToDisplay.innerHTML = user + '<span class="timespan">(</span>' + date + '): ' + '<img src="' + imgUrl + '">';
@@ -454,7 +450,7 @@
 	    	container.scrollTop = container.scrollHeight;
 	    },
 	    _displayVideo : function(user,url){
-	    	var container = document.getElementById('historyMsg'),
+	    	var container = $id('historyMsg'),
 	    	    msgToDisplay = document.createElement('p'),
 	    	    date = new Date().toTimeString().substr(0, 8);
 	    	msgToDisplay.innerHTML = user + '<span class="timespan">(</span>' + date + '): ' + '<p><video width="320" controls="false"><source src="' + url+ '">您的浏览器不支持Video标签。</video></p>';
